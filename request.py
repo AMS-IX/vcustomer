@@ -2,15 +2,20 @@
 """request.py - sending REST requests to the docker API.
 
 Usage:
-  request.py get network <net_name>
-  request.py get container [-a --all]
+  request.py inspect network [<net_name>]
+  request.py inspect container [<name>]
   request.py create network <net_name> <parent_if>
   request.py create container <name> <net_name> [<ip> <mac>]
+  request.py delete network <net_name>
+  request.py delete container <name>
   request.py start container <name>
+  request.py stop container <name>
 
 Options:
   -h --help     Show this screen.
   --version     Show version.
+
+Author: Joris Claassen
 
 """
 import json
@@ -22,14 +27,20 @@ import requests
 rest_api = "http://lamstix.lab.ams-ix.net:2375"
 
 # function to retreive network information from the docker API
-def get_net(net_name):
-	rnet = requests.get(rest_api + "/networks/" + net_name)
-	return rnet.json()
+def get_net():
+	if args["<net_name>"]:
+		r = requests.get(rest_api + "/networks/" + args["<net_name>"])
+	else:
+		r = requests.get(rest_api + "/networks/")
+	return r.json()
 
 # function to retrieve container information from the docker API
 def get_cont():
-	rcont = requests.get(rest_api + "/containers/json")
-	return rcont.json()
+	if args["<name>"]:
+		r = requests.get(rest_api + "/containers/" + args["<name>"] + "/json")
+	else:
+		r = requests.get(rest_api + "/containers/json?all=1")
+	return r.json()
 
 # function to create a new network using the docker API
 def create_net(net_name, parent_if):
@@ -46,8 +57,8 @@ def create_net(net_name, parent_if):
 		} 
 	
 	headers = {"content-type": "application/json"}
-	response = requests.post(rest_api + "/networks/create", data=json.dumps(payload), headers=headers)	
-	print(response.text)
+	r = requests.post(rest_api + "/networks/create", data=json.dumps(payload), headers=headers)	
+	print(r.text)
 
 # function to create a new container using the docker API
 def create_cont(name, net_name, ip, mac):
@@ -79,25 +90,38 @@ def create_cont(name, net_name, ip, mac):
 			}
 		}
 	headers = {"content-type": "application/json"}
-	response = requests.post(rest_api + "/containers/create?name=" + name, data=json.dumps(payload), headers=headers)
-	
-	print(rest_api + "/containers/create?name=" + name)
-	print(headers)
-	print(json.dumps(payload, sort_keys=True, indent=4, separators=(',', ': ')))
-	print(response.text)
+	r = requests.post(rest_api + "/containers/create?name=" + name, data=json.dumps(payload), headers=headers)
+	print(r.text)
+
+# function to delete a network using the docker API
+def del_net(name):
+	r = requests.delete(rest_api + "/networks/" + name)
+	print(r.text)
+
+# function to kill and delete a container using the docker API
+def del_cont(name):
+	r = requests.post(rest_api + "/containers/" + name + "/kill")
+	print(r.text)
+	r = requests.delete(rest_api + "/containers/" + name)
+	print(r.text)
 
 # function to start a container using the docker API
 def start_cont(name):
-	response = requests.post(rest_api + "/containers/" + name + "/start")
-	print(response.text)
+	r = requests.post(rest_api + "/containers/" + name + "/start")
+	print(r.text)
+
+# function to stop a container using the docker API
+def stop_cont(name):
+	r = requests.post(rest_api + "/containers/" + name + "/stop")
+	print(r.text)
 
 # main program
 args = docopt(__doc__, version='request.py 0.0.1')
 
-if args["get"] and args["network"]:
-	print(json.dumps(get_net(args["<net_name>"]), sort_keys=True, indent=4, separators=(',', ': ')))	
+if args["inspect"] and args["network"]:
+	print(json.dumps(get_net(), sort_keys=True, indent=4, separators=(',', ': ')))	
 
-if args["get"] and args["container"]:
+if args["inspect"] and args["container"]:
 	print(json.dumps(get_cont(), sort_keys=True, indent=4, separators=(',', ': ')))
 
 if args["create"] and args["network"]:
@@ -106,5 +130,14 @@ if args["create"] and args["network"]:
 if args["create"] and args["container"]:
 	create_cont(args["<name>"], args["<net_name>"], args["<ip>"], args["<mac>"])
 
+if args["delete"] and args["network"]:
+	del_net(args["<net_name>"])
+
+if args["delete"] and args["container"]:
+	del_cont(args["<name>"])
+
 if args["start"] and args["container"]:
 	start_cont(args["<name>"])
+
+if args["stop"] and args["container"]:
+	stop_cont(args["<name>"])
