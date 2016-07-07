@@ -10,7 +10,7 @@ Usage:
   request.py delete container <name>
   request.py start container <name>
   request.py stop container <name>
-  request.py execute <container> <command> [<var1> <var2>]
+  request.py execute <container> <command>
 
 Options:
   -h --help     Show this screen.
@@ -143,7 +143,6 @@ def del_cont(name):
         	print(r.text)
 
 # function to start an execute command in an container
-
 def start_exec(id):
 	payload = {
 			"Detach": False,
