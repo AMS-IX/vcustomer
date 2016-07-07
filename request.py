@@ -10,6 +10,7 @@ Usage:
   request.py delete container <name>
   request.py start container <name>
   request.py stop container <name>
+  request.py execute <container> <command> [<var1> <var2>]
 
 Options:
   -h --help     Show this screen.
@@ -103,6 +104,27 @@ def create_cont(name, net_name, ip, mac):
 	else:
 		print(r.text)
 
+# function to create an excute command for an container
+def create_exec(name, cmd):
+	payload = {
+                        "AttachStdin": False,
+                        "AttachStdout": True,
+                        "AttachStderr": True,
+			"DetachKeys": "ctrl-p,ctrl-q",
+			"Tty": False,
+			"Cmd": [
+				"/bin/sh",
+				"-c",
+				cmd
+			],
+		}
+	headers = {"content-type": "application/json"}
+	r = requests.post(rest_api + "/containers/" + name + "/exec", data=json.dumps(payload), headers=headers)
+	if r.status_code is 201:
+		data = json.loads(r.content.decode())
+		return(data["Id"])
+	else:
+		print(r.text)
 
 # function to delete a network using the docker API
 def del_net(name):
@@ -119,6 +141,17 @@ def del_cont(name):
 		print("Success!")
 	else:
         	print(r.text)
+
+# function to start an execute command in an container
+
+def start_exec(id):
+	payload = {
+			"Detach": False,
+			"Tty": False
+		}
+	headers = {"content-type": "application/json"}
+	r = requests.post(rest_api + "/exec/" + id + "/start", data=json.dumps(payload), headers=headers)
+	print(r.text)
 
 # function to start a container using the docker API
 def start_cont(name):
@@ -162,3 +195,8 @@ if args["start"] and args["container"]:
 
 if args["stop"] and args["container"]:
 	stop_cont(args["<name>"])
+
+if args["execute"]:
+	exec_id = create_exec(args["<container>"], args["<command>"])
+	if exec_id:
+		start_exec(exec_id)
