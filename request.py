@@ -53,12 +53,18 @@ def create_net(net_name, parent_if):
 				"Config": [{
 					"Subnet": "10.25.208.0/21"}]
 				},
-			"Options": {"parent": parent_if}
+			"Options": {
+				"parent": parent_if,
+				"macvlan_mode": "vepa"
+			}
 		} 
 	
 	headers = {"content-type": "application/json"}
 	r = requests.post(rest_api + "/networks/create", data=json.dumps(payload), headers=headers)	
-	print(r.text)
+	if r.status_code is 201:
+		print("Success!")
+	else:
+		print(r.text)
 
 # function to create a new container using the docker API
 def create_cont(name, net_name, ip, mac):
@@ -77,7 +83,8 @@ def create_cont(name, net_name, ip, mac):
 			"NetworkDisabled": False,
 			"MacAddress": mac,
 			"HostConfig": {
-				"NetworkMode": net_name
+				"NetworkMode": net_name,
+				"Privileged": True
 			},
 			"NetworkingConfig": {
 				"EndpointsConfig": {
@@ -91,29 +98,42 @@ def create_cont(name, net_name, ip, mac):
 		}
 	headers = {"content-type": "application/json"}
 	r = requests.post(rest_api + "/containers/create?name=" + name, data=json.dumps(payload), headers=headers)
-	print(r.text)
+	if r.status_code is 201:
+		print("Success!")
+	else:
+		print(r.text)
+
 
 # function to delete a network using the docker API
 def del_net(name):
 	r = requests.delete(rest_api + "/networks/" + name)
-	print(r.text)
+	if r.status_code is 204:
+		print("Success!")
+	else:
+		print(r.text)
 
 # function to kill and delete a container using the docker API
 def del_cont(name):
-	r = requests.post(rest_api + "/containers/" + name + "/kill")
-	print(r.text)
 	r = requests.delete(rest_api + "/containers/" + name)
-	print(r.text)
+	if r.status_code is 204:
+		print("Success!")
+	else:
+        	print(r.text)
 
 # function to start a container using the docker API
 def start_cont(name):
 	r = requests.post(rest_api + "/containers/" + name + "/start")
-	print(r.text)
+	if r.status_code is 204:
+		print("Success!")
+	else:
+		print(r.text)
 
-# function to stop a container using the docker API
 def stop_cont(name):
 	r = requests.post(rest_api + "/containers/" + name + "/stop")
-	print(r.text)
+	if r.status_code is 204:
+		print("Success!")
+	else:
+		print(r.text)
 
 # main program
 args = docopt(__doc__, version='request.py 0.0.1')
@@ -134,6 +154,7 @@ if args["delete"] and args["network"]:
 	del_net(args["<net_name>"])
 
 if args["delete"] and args["container"]:
+	stop_cont(args["<name>"])
 	del_cont(args["<name>"])
 
 if args["start"] and args["container"]:
