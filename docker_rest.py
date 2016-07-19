@@ -1,6 +1,6 @@
 # Docker REST API module
-import requests
 import json
+import requests
 
 # function to create a new container using the docker API
 def CreateCont(rest_api, name, net_name, ip="", mac=""):
