@@ -150,7 +150,7 @@ def start_exec(id):
 		}
 	headers = {"content-type": "application/json"}
 	r = requests.post(rest_api + "/exec/" + id + "/start", data=json.dumps(payload), headers=headers)
-	print(r.text)
+	print(r.__dict__)
 
 # function to start a container using the docker API
 def start_cont(name):
