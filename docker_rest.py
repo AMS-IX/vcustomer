@@ -3,7 +3,7 @@ import json
 import requests
 
 # function to create a new container using the docker API
-def CreateCont(rest_api, name, net_name, ip="", mac=""):
+def CreateContainer(rest_api, name, net_name, ip="", mac=""):
 	payload = {
 			"Hostname": name,
 			"AttachStdin": False,
@@ -98,7 +98,7 @@ def CreateNet(rest_api, net_name, parent_if):
 		return r.text
 
 # function to retrieve container information from the docker API
-def InspectCont(rest_api, cont_name=""):
+def InspectContainer(rest_api, cont_name=""):
 	if cont_name == "":
 		r = requests.get(rest_api + "/containers/json?all=1")
 	else:
@@ -128,7 +128,7 @@ def InspectNet(rest_api, net_name=""):
 		return r.text
 
 # function to kill and delete a container using the docker API
-def RemoveCont(rest_api, name):
+def RemoveContainer(rest_api, name):
 	r = requests.delete(rest_api + "/containers/" + name)
 	try:
 		assert r.status_code == 204
@@ -152,7 +152,7 @@ def RemoveNet(rest_api, name):
 		return r.text
 
 # function to start a container using the docker API
-def StartCont(rest_api, name):
+def StartContainer(rest_api, name):
 	r = requests.post(rest_api + "/containers/" + name + "/start")
 	try:
 		assert r.status_code == 204
@@ -180,7 +180,7 @@ def StartExec(rest_api, id):
 		return "API output:"
 		return r.text
 
-def StopCont(rest_api, name):
+def StopContainer(rest_api, name):
 	r = requests.post(rest_api + "/containers/" + name + "/stop")
 	try:
 		assert r.status_code == 204
