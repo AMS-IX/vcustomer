@@ -33,15 +33,7 @@ def CreateContainer(rest_api, name, net_name, ip="", mac=""):
 			}
 		}
 	headers = {"content-type": "application/json"}
-	r = requests.post(rest_api + "/containers/create?name=" + name, data=json.dumps(payload), headers=headers)
-	try:
-		assert r.status_code == 201
-		return r.json()
-	except AssertionError:
-		return "HTTP status code not correct!"
-		return ""
-		return "API output:"
-		return r.text
+	return requests.post(rest_api + "/containers/create?name=" + name, data=json.dumps(payload), headers=headers)
 
 # function to create an excute command for an container using the docker API
 def CreateExec(rest_api, name, cmd):
@@ -62,15 +54,15 @@ def CreateExec(rest_api, name, cmd):
 	try:
 		assert r.status_code == 201
 		data = json.loads(r.content.decode())
-		return(data["Id"])
+		retur(data["Id"])
 	except AssertionError:
-		return "HTTP status code not correct!"
-		return ""
-		return "API output:"
-		return r.text
+		data = json.loads(r.content.decode())
+		return("HTTP status code not correct!\n\n"
+			"API output:\n"
+			+ r.text)
 
 # function to create a new network using the docker API
-def CreateNet(rest_api, net_name, parent_if):
+def CreateNet(rest_api, net_name, parent_if, network="10.25.208.0", netmask="21"):
 	payload = {
 			"Name": net_name,
 			"CheckDuplicate": True,
@@ -78,7 +70,7 @@ def CreateNet(rest_api, net_name, parent_if):
 			"EnableIPv6": False,
 			"IPAM": {
 				"Config": [{
-					"Subnet": "10.25.208.0/21"}]
+					"Subnet": network + "/" + netmask}]
 				},
 			"Options": {
 				"parent": parent_if,
@@ -90,12 +82,12 @@ def CreateNet(rest_api, net_name, parent_if):
 	r = requests.post(rest_api + "/networks/create", data=json.dumps(payload), headers=headers)	
 	try:
 		assert r.status_code == 201
-		return r.json()
+		data = json.loads(r.content.decode())
+		return(data["Id"])
 	except AssertionError:
-		return "HTTP status code not correct!"
-		return ""
-		return "API output:"
-		return r.text
+		return("HTTP status code not correct!\n"
+			"API output:"
+			+ r.text)
 
 # function to retrieve container information from the docker API
 def InspectContainer(rest_api, cont_name=""):
@@ -107,10 +99,9 @@ def InspectContainer(rest_api, cont_name=""):
 		assert r.status_code == 200
 		return r.json()
 	except AssertionError:
-		return "HTTP status code not correct!"
-		return ""
-		return "API output:"
-		return r.text
+		return("HTTP status code not correct!\n\n"
+			"API output:\n"
+			+ r.text)
 
 # function to retreive network information from the docker API
 def InspectNet(rest_api, net_name=""):
@@ -122,10 +113,9 @@ def InspectNet(rest_api, net_name=""):
 		assert r.status_code == 200
 		return r.json()
 	except AssertionError:
-		return "HTTP status code not correct!"
-		return ""
-		return "API output:"
-		return r.text
+		return("HTTP status code not correct!\n\n"
+			"API output:\n"
+			+ r.text)
 
 # function to kill and delete a container using the docker API
 def RemoveContainer(rest_api, name):
@@ -134,10 +124,9 @@ def RemoveContainer(rest_api, name):
 		assert r.status_code == 204
 		return "Container removed succesfully!"
 	except AssertionError:
-		return "HTTP status code not correct!"
-		return ""
-		return "API output:"
-		return r.text
+		return("HTTP status code not correct!\n\n"
+			"API output:\n"
+			+ r.text)
 
 # function to delete a network using the docker API
 def RemoveNet(rest_api, name):
@@ -146,10 +135,9 @@ def RemoveNet(rest_api, name):
 		assert r.status_code == 204
 		return "Network removed succesfully!"
 	except AssertionError:
-		return "HTTP status code not correct!"
-		return ""
-		return "API output:"
-		return r.text
+		return("HTTP status code not correct!\n\n"
+			"API output:\n"
+			+ r.text)
 
 # function to start a container using the docker API
 def StartContainer(rest_api, name):
@@ -158,10 +146,9 @@ def StartContainer(rest_api, name):
 		assert r.status_code == 204
 		return "Container started succesfully!"
 	except AssertionError:
-		return "HTTP status code not correct!"
-		return ""
-		return "API output:"
-		return r.text
+		return("HTTP status code not correct!\n\n"
+			"API output:\n"
+			+ r.text)
 
 # function to start an execute command in an container
 def StartExec(rest_api, id):
@@ -175,10 +162,9 @@ def StartExec(rest_api, id):
 		assert r.status_code == 200
 		return r.__dict__
 	except AssertionError:
-		return "HTTP status code not correct!"
-		return ""
-		return "API output:"
-		return r.text
+		return("HTTP status code not correct!\n\n"
+			"API output:\n"
+			+ r.text)
 
 def StopContainer(rest_api, name):
 	r = requests.post(rest_api + "/containers/" + name + "/stop")
@@ -186,7 +172,6 @@ def StopContainer(rest_api, name):
 		assert r.status_code == 204
 		return "Container stopped succesfully!"
 	except AssertionError:
-		return "HTTP status code not correct!"
-		return ""
-		return "API output:"
-		return r.text
+		return("HTTP status code not correct!\n\n"
+			"API output:\n"
+			+ r.text)
