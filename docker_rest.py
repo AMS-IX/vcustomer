@@ -54,7 +54,7 @@ def CreateExec(rest_api, name, cmd):
 	try:
 		assert r.status_code == 201
 		data = json.loads(r.content.decode())
-		retur(data["Id"])
+		return(data["Id"])
 	except AssertionError:
 		data = json.loads(r.content.decode())
 		return("HTTP status code not correct!\n\n"
@@ -151,16 +151,22 @@ def StartContainer(rest_api, name):
 			+ r.text)
 
 # function to start an execute command in an container
-def StartExec(rest_api, id):
-	payload = {
-			"Detach": False,
-			"Tty": False
-		}
+def StartExec(rest_api, id, action):
+	if action == "fg" :
+		payload = {
+				"Detach": False,
+				"Tty": True
+			}
+	if action == "bg" :
+		payload = {
+				"Detach": True,
+				"Tty": True
+			}
 	headers = {"content-type": "application/json"}
-	r = requests.post(rest_api + "/exec/" + id + "/start", data=json.dumps(payload), headers=headers)
+	r = requests.post(rest_api + "/exec/" + id + "/start", data=json.dumps(payload), headers=headers, stream=True)
 	try:
 		assert r.status_code == 200
-		return r.__dict__
+		return r
 	except AssertionError:
 		return("HTTP status code not correct!\n\n"
 			"API output:\n"
