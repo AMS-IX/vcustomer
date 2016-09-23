@@ -106,7 +106,7 @@ def InspectContainer(rest_api, cont_name=""):
 # function to retreive network information from the docker API
 def InspectNet(rest_api, net_name=""):
 	if net_name == "":
-		r = requests.get(rest_api + "/networks/")
+		r = requests.get(rest_api + "/networks?filters={\"type\":{\"custom\":true}}")
 	else:
 		r = requests.get(rest_api + "/networks/" + net_name)
 	try:
@@ -122,7 +122,7 @@ def RemoveContainer(rest_api, name):
 	r = requests.delete(rest_api + "/containers/" + name)
 	try:
 		assert r.status_code == 204
-		return "Container removed succesfully!"
+		return "Container " + name + " removed succesfully!"
 	except AssertionError:
 		return("HTTP status code not correct!\n\n"
 			"API output:\n"
@@ -133,7 +133,7 @@ def RemoveNet(rest_api, name):
 	r = requests.delete(rest_api + "/networks/" + name)
 	try:
 		assert r.status_code == 204
-		return "Network removed succesfully!"
+		return "Network " + name + " removed succesfully!"
 	except AssertionError:
 		return("HTTP status code not correct!\n\n"
 			"API output:\n"
@@ -144,7 +144,7 @@ def StartContainer(rest_api, name):
 	r = requests.post(rest_api + "/containers/" + name + "/start")
 	try:
 		assert r.status_code == 204
-		return "Container started succesfully!"
+		return "Container " + name + " started succesfully!"
 	except AssertionError:
 		return("HTTP status code not correct!\n\n"
 			"API output:\n"
@@ -176,7 +176,7 @@ def StopContainer(rest_api, name):
 	r = requests.post(rest_api + "/containers/" + name + "/stop")
 	try:
 		assert r.status_code == 204
-		return "Container stopped succesfully!"
+		return "Container " + name + " stopped succesfully!"
 	except AssertionError:
 		return("HTTP status code not correct!\n\n"
 			"API output:\n"
