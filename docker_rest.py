@@ -13,9 +13,9 @@ def CreateContainer(rest_api, name, net_name, ip="", mac=""):
 			"OpenStdin": True,
 			"StdinOnce": False,
 			"Cmd": [
-				"/bin/sh"
+				"/bin/bash"
 			],
-			"Image": "alpine",
+			"Image": "7a49ecc05fe4",
 			"NetworkDisabled": False,
 			"MacAddress": mac,
 			"HostConfig": {

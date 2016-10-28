@@ -2,7 +2,7 @@
 """vcustomer.py - spinning up docker instances from the my-amsix api.
 
 Usage:
-  vcustomer.py --create (quarantine|isp) <docker_api> <docker_net> <link-id>
+  vcustomer.py --create (quarantine|isp) <docker_api> <link-id> <docker_net>
   vcustomer.py --convert (quarantine|isp) <docker_api> <link-id>
   vcustomer.py --execute (foreground|background) <docker_api> <link-id> <command>
   vcustomer.py --init-net <docker_api> <docker_net> <docker_phys> <link-id>
@@ -28,63 +28,90 @@ import myamsix_rest
 
 args = docopt(__doc__, version='vcustomer.py 0.0.1')
 
-def AddAddress(ip, subnet):
-	Execute("ip addr add " + ip + "/" + subnet + " dev eth0")
+def AddAddress(ip, subnet, vlan):
+	Execute("ip link add link eth0 eth0." + vlan + " type vlan proto 802.1ad id " + vlan)
+	Execute("ip link set eth0." + vlan + " up")
+	Execute("ip addr add " + ip + "/" + subnet + " dev eth0." + vlan)
 
-def AddRoute(network, subnet):
-	Execute("ip route add " + network + "/" + subnet + " via dev eth0")
+def AddRoute(network, subnet, vlan):
+	Execute("ip route add " + network + "/" + subnet + " via dev eth0." + vlan)
 
-def CreateQuarantine():
+def Create():
 	link = myamsix_rest.GetLink(myamsix_api,args["<link-id>"])
+	if "vlans" not in link:
+		print("No vlans in this link, is this link-id reserved correctly?")
+		exit(1)
 	addr = link["vlans"][0]["routers"][0]["quarantine"]["address"]
 	subnet = link["vlans"][0]["routers"][0]["quarantine"]["netmask"]
-	create = docker_rest.CreateContainer(args["<docker_api>"], args["<link-id>"], args["<docker_net>"], addr)
-	data = json.loads(create.content.decode())
+	qip = IPNetwork(str(addr) + "/" + str(subnet))
+	create = docker_rest.CreateContainer(args["<docker_api>"], args["<link-id>"], args["<docker_net>"], str(qip.ip))
 	try:
 		assert create.status_code == 201
 		print("Container created succesfully!")
+		data = json.loads(create.content.decode())
 		print(docker_rest.StartContainer(args["<docker_api>"], data["Id"])) 
 	except AssertionError:
 		print("Container not created succesfully:\n\n"
 			+ data["message"])
+		exit(1)
+	if args["quarantine"]:
+		ConvertTo("quarantine")
+	elif args["isp"]:
+		ConvertTo("isp")
 
-def CreateVlan(ip):
-	iphash = hashlib.sha256(ip.encode()).hexdigest()
-	if int(iphash, 16)%10000 < 4090:
-		vlan = int(iphash, 16)%10000
+def CreateVlan(linkid):
+	linkhash = hashlib.sha256(linkid.encode()).hexdigest()
+	if int(linkhash, 16)%10000 < 4090:
+		vlan = int(linkhash, 16)%10000
 		return vlan
 	else:
-		vlan = int(iphash, 16)%1000
+		vlan = int(linkhash, 16)%1000
 		return vlan
 
 def ConvertTo(target):
-	FlushAddress()
 	link = myamsix_rest.GetLink(myamsix_api,args["<link-id>"])
-	# extract production ipv4 ip
-	for router in link["vlans"][0]["routers"]:
-		if router["class"].startswith("Ipv4"):
-			ispip = IPNetwork(router["ip"] + "/" + str(router["netmask"]))
-	# extract quarantine ipv4 ip
-	addr = link["vlans"][0]["routers"][0]["quarantine"]["address"]
-	subnet = link["vlans"][0]["routers"][0]["quarantine"]["netmask"]
-	qip = IPNetwork(str(addr) + "/" + str(subnet))
-	print(CreateVlan(str(ispip.ip)))
+	if "vlans" not in link:
+		print("No vlans in this link, is this link-id reserved correctly?")
+		exit(1)
+	# generate service vlan based on link-id
+	vlan = CreateVlan(args["<link-id>"])
+	# clear all existing network config in the container
+	FlushAddress(vlan)
+	# extract production ipv4 ip if isp vlan is requested
 	if target == "isp":
-		AddAddress(str(ispip.ip), str(ispip.prefixlen))
-		AddRoute(str(ispip.network), str(ispip.prefixlen))
+		for router in link["vlans"][0]["routers"]:
+			if router["class"].startswith("Ipv4"):
+				ip = IPNetwork(router["ip"] + "/" + str(router["netmask"]))
+        # extract quarantine ipv4 ip if isp vlan is requested
 	elif target == "quarantine":
-		AddAddress(str(qip.ip), str(qip.prefixlen))
-		AddRoute(str(qip.network), str(qip.prefixlen))
-	print("Container " + args["<link-id>"] + " succesfully converted to " + target + " vlan.")
-	
+		addr = link["vlans"][0]["routers"][0]["quarantine"]["address"]
+		subnet = link["vlans"][0]["routers"][0]["quarantine"]["netmask"]
+		ip = IPNetwork(str(addr) + "/" + str(subnet))
+	# add address and route to the container
+	AddAddress(str(ip.ip), str(ip.prefixlen), str(vlan))
+	AddRoute(str(ip.network), str(ip.prefixlen), str(vlan))
+	print("Container " + args["<link-id>"] + " succesfully converted to " + target + " vlan, service vlan " + str(vlan) + ".")
+	# print the attached physical network adapter and physical port (pxc or edge)
+	for interface in docker_rest.InspectContainer(args["<docker_api>"], args["<link-id>"])["NetworkSettings"]["Networks"]:
+		print("This container is physically connected to " + interface)
+	for port in link["ports"]:
+		print("The port this container should be connected to is " + port["formatted"])
+
 def Execute(command=args["<command>"]):
 	action = "bg"
 	if args["foreground"]:
 		action = "fg"
-	print(docker_rest.StartExec(args["<docker_api>"], docker_rest.CreateExec(args["<docker_api>"], args["<link-id>"], command), action).text)
+	cmd = docker_rest.StartExec(args["<docker_api>"], docker_rest.CreateExec(args["<docker_api>"], args["<link-id>"], command), action)
+	try:
+		assert cmd.status_code == 200
+		return cmd
+	except AssertionError:
+		print("Pushing execute command to container failed.")
+		exit(1)
 
-def FlushAddress():
+def FlushAddress(vlan):
 	Execute("ip addr flush dev eth0")
+	Execute("ip addr flush dev eth0." + str(vlan))
 
 def InitNet():
 	link = myamsix_rest.GetLink(myamsix_api,args["<link-id>"])
@@ -98,9 +125,7 @@ myamsix_api="http://my-staging.lab.ams-ix.net"
 
 # create and start docker container based on myamsix link id
 if args["--create"]:
-	CreateQuarantine()
-	if args["isp"]:
-		ConvertTo("isp")
+	Create()
 
 # convert ip settings to isp or quarantine
 if args["--convert"]:
@@ -125,8 +150,11 @@ if args["--list"]:
 
 if args["--list-net"]:
 	networks = docker_rest.InspectNet(args["<docker_api>"])
-	for network in networks:
-		print(network["Name"])
+	try: 
+		for network in networks:
+			print(str(network["Name"]))
+	except TypeError:
+		print("There are no docker networks defined on this host")
 
 # stop and remove docker container
 if args["--remove"]:
@@ -144,5 +172,8 @@ if args["--wipe"]:
 		print(docker_rest.StopContainer(args["<docker_api>"],(str(vcustomer["Names"][0])[1:])))
 		print(docker_rest.RemoveContainer(args["<docker_api>"], (str(vcustomer["Names"][0])[1:])))
 	networks = docker_rest.InspectNet(args["<docker_api>"])
-	for network in networks:
-		print(docker_rest.RemoveNet(args["<docker_api>"], str(network["Name"])))
+	try:
+		for network in networks:
+			print(docker_rest.RemoveNet(args["<docker_api>"], str(network["Name"])))
+	except TypeError:
+		print("There are no docker networks defined on this host")
