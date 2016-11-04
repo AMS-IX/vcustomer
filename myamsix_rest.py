@@ -3,8 +3,8 @@ import json
 import requests
 
 # function to get the link JSON data
-def GetLink(rest_api, link, value=""):
-	r = requests.get(rest_api + "/api/v1/links/" + link)
+def GetLink(rest_api, link, value="", exchange="LAB"):
+	r = requests.get(rest_api + "/api/v1/links/" + link + ".json?exchange=" + exchange)
 	try:
 		assert r.status_code == 200
 		data = json.loads(r.content.decode())
