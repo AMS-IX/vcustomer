@@ -45,10 +45,14 @@ def Create():
     except IndexError:
         try:
             addr = link["quarantined_ipv4_address"]
-        except IndexError:
-            print("Failed to get any quarantine address for this link-id, does it exist?")
-            exit(1)
-        subnet = 21
+        except KeyError:
+            # partners do not have a quarantine IP after enabling
+            if args["partner"]:
+                addr = "10.25.7.1" 
+            else:
+                print("Failed to get any quarantine address for this link-id, does it exist, or is the link already enabled?")
+                exit(1)
+            subnet = 21
     ip = IPNetwork(str(addr) + "/" + str(subnet))
     create = docker_rest.CreateContainer(args["<docker_api>"], args["<link-id>"],
                                          args["<docker_net>"], str(ip.ip))
@@ -103,7 +107,7 @@ def ConvertTo(target):
         except:
             try:
                 addr = link["quarantined_ipv4_address"]
-            except:
+            except KeyError:
                 print("Failed to get any quarantine address for this link-id, does it exist?")
                 exit(1)
             subnet = 21
@@ -118,13 +122,20 @@ def ConvertTo(target):
     print("Container " + args["<link-id>"] + " succesfully converted to " + target +
           " vlan, service vlan " + str(vlan) + ".")
     # print the attached physical network adapter and physical port (pxc or edge)
-    for interface in docker_rest.InspectContainer(args["<docker_api>"],
-                                                  args["<link-id>"])["NetworkSettings"]["Networks"]:
+    global if_tagged
+    for interface in docker_rest.InspectContainer(args["<docker_api>"],args["<link-id>"])["NetworkSettings"]["Networks"]:
+        if_tagged=interface
         print("This container is physically connected to " + interface)
+    global if_untagged
     for port in link["ports"]:
         print("The port this container should be connected to is " + port["formatted"])
+        if_untagged=port["formatted"]
+    print()
+    # print m6_provision command - this should be automatically called later!
+    print("m6_provision --add-qinq-bridge " + if_tagged + " " + if_untagged + " " + str(vlan))
 
 def Execute(command=args["<command>"]):
+    global action
     action = "bg"
     if args["foreground"]:
         action = "fg"
@@ -133,9 +144,12 @@ def Execute(command=args["<command>"]):
                                                                              command), action)
     try:
         assert cmd.status_code == 200
-        return cmd
-    except AssertionError:
-        print("Pushing execute command to container failed.")
+        if action == "bg":
+            return(cmd.text)
+        if action == "fg":
+            print(cmd.text)
+    except (AssertionError, AttributeError):
+        print("Pushing execute command to container failed, does it exist?")
         exit(1)
 
 def FlushAddress(vlan):
@@ -154,6 +168,17 @@ def InitNet():
                                                                              str(ip.network),
                                                                              str(ip.prefixlen))))
 
+def Remove():
+    # generate service vlan based on link-id
+    vlan = CreateVlan(args["<link-id>"])
+    # stop container
+    print(docker_rest.StopContainer(args["<docker_api>"], args["<link-id>"]))
+    # remove container
+    print(docker_rest.RemoveContainer(args["<docker_api>"], args["<link-id>"]))
+    # print m6_provision command - this should be automatically called later!
+    print("m6_provision --del-qinq-bridge " + str(vlan))
+
+
 #myamsix_api = "http://my.ams-ix.net"
 myamsix_api = "http://my-staging.lab.ams-ix.net"
 
@@ -169,6 +194,8 @@ if args["--convert"]:
         ConvertTo("quarantine")
     if args["partner"]:
         ConvertTo("partner")
+
+
 
 # execute command in container
 if args["--execute"]:
@@ -195,8 +222,7 @@ if args["--list-net"]:
 
 # stop and remove docker container
 if args["--remove"]:
-    print(docker_rest.StopContainer(args["<docker_api>"], args["<link-id>"]))
-    print(docker_rest.RemoveContainer(args["<docker_api>"], args["<link-id>"]))
+   Remove() 
 
 # remove docker network
 if args["--remove-net"]:
