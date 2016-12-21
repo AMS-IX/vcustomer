@@ -195,8 +195,6 @@ if args["--convert"]:
     if args["partner"]:
         ConvertTo("partner")
 
-
-
 # execute command in container
 if args["--execute"]:
     Execute()
